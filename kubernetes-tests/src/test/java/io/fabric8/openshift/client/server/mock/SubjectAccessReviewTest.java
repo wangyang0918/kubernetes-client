@@ -50,7 +50,7 @@ class SubjectAccessReviewTest {
   void testCreate() {
     server.expect().withPath("/apis/authorization.openshift.io/v1/subjectaccessreviews").andReturn(201, new SubjectAccessReviewResponseBuilder()
       .withReason("r1")
-      .build()).once();
+      .build()).times(2);
     SubjectAccessReviewResponse response = client.inAnyNamespace().subjectAccessReviews().create(new SubjectAccessReviewBuilder()
       .build());
     assertNotNull(response);
@@ -62,7 +62,7 @@ class SubjectAccessReviewTest {
   void testCreateInLine() {
     server.expect().withPath("/apis/authorization.openshift.io/v1/subjectaccessreviews").andReturn(201, new SubjectAccessReviewResponseBuilder()
       .withReason("r2")
-      .build()).once();
+      .build()).times(2);
 
     SubjectAccessReviewResponse response = client.inAnyNamespace().subjectAccessReviews()
       .create(new SubjectAccessReviewBuilder().build());
@@ -75,7 +75,7 @@ class SubjectAccessReviewTest {
   void testCreateLocal() {
    server.expect().withPath("/apis/authorization.openshift.io/v1/namespaces/test/localsubjectaccessreviews").andReturn(201, new SubjectAccessReviewResponseBuilder()
       .withReason("r1")
-      .build()).once();
+      .build()).times(2);
 
 
     SubjectAccessReviewResponse response = client.localSubjectAccessReviews().inNamespace("test").create(new LocalSubjectAccessReviewBuilder()
@@ -92,7 +92,7 @@ class SubjectAccessReviewTest {
   void testCreateLocalInLine() {
    server.expect().withPath("/apis/authorization.openshift.io/v1/namespaces/test/localsubjectaccessreviews").andReturn( 201, new SubjectAccessReviewResponseBuilder()
       .withReason("r2")
-      .build()).once();
+      .build()).times(2);
 
 
     SubjectAccessReviewResponse response = client.localSubjectAccessReviews().inNamespace("test").create(new LocalSubjectAccessReviewBuilder()
@@ -110,7 +110,7 @@ class SubjectAccessReviewTest {
       .andReturn( HTTP_CREATED, new ResourceAccessReviewResponseBuilder()
         .addToGroups("system:cluster-admins", "system:masters")
         .addToUsers("kubeadmin", "system:admin")
-      .build()).once();
+      .build()).times(2);
 
     // When
     ResourceAccessReviewResponse response = client.resourceAccessReviews().create(new ResourceAccessReviewBuilder()
@@ -132,7 +132,7 @@ class SubjectAccessReviewTest {
         .withNamespace("ns1")
         .addToGroups("system:cluster-admins", "system:masters")
         .addToUsers("kubeadmin", "system:admin")
-        .build()).once();
+        .build()).times(2);
 
     // When
     ResourceAccessReviewResponse response = client.localResourceAccessReviews().inNamespace("ns1").create(new LocalResourceAccessReviewBuilder()
@@ -160,7 +160,7 @@ class SubjectAccessReviewTest {
         .withResources("buildconfigs/webhooks")
         .endRule()
         .endStatus()
-        .build()).once();
+        .build()).times(2);
 
     // When
     SelfSubjectRulesReview response = client.selfSubjectRulesReviews().inNamespace("test").create(new SelfSubjectRulesReviewBuilder()
@@ -187,7 +187,7 @@ class SubjectAccessReviewTest {
         .withResources("imagestreams")
         .endRule()
         .endStatus()
-        .build()).once();
+        .build()).times(2);
 
     // When
     SubjectRulesReview response = client.subjectRulesReviews().inNamespace("test").create(new SubjectRulesReviewBuilder()

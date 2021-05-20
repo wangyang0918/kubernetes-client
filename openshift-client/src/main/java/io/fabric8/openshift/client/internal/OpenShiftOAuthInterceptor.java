@@ -17,10 +17,18 @@
 package io.fabric8.openshift.client.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.authorization.v1.SelfSubjectAccessReview;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.utils.Serialization;
 import io.fabric8.kubernetes.client.utils.URLUtils;
 import io.fabric8.kubernetes.client.utils.Utils;
+import io.fabric8.openshift.api.model.LocalResourceAccessReview;
+import io.fabric8.openshift.api.model.LocalSubjectAccessReview;
+import io.fabric8.openshift.api.model.ResourceAccessReview;
+import io.fabric8.openshift.api.model.SelfSubjectRulesReview;
+import io.fabric8.openshift.api.model.SubjectAccessReview;
+import io.fabric8.openshift.api.model.SubjectRulesReview;
 import io.fabric8.openshift.client.OpenShiftConfig;
 import okhttp3.Credentials;
 import okhttp3.Interceptor;
@@ -30,7 +38,10 @@ import okhttp3.Response;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
@@ -46,6 +57,11 @@ public class OpenShiftOAuthInterceptor implements Interceptor {
   private static final String AFTER_TOKEN = "&expires";
   private static final String K8S_AUTHORIZATION = "authorization.k8s.io";
   private static final String OPENSHIFT_AUTHORIZATION = "authorization.openshift.io";
+  private static final Predicate<String> isAuthorizationApiGroupRequest = s -> s.contains(K8S_AUTHORIZATION) || s.contains(OPENSHIFT_AUTHORIZATION);
+  private static final List<String> createOnlyResources = new ArrayList<>();
+  static {{
+    initCreateOnlyResources();
+  }}
 
   private final OkHttpClient client;
   private final OpenShiftConfig config;
@@ -151,9 +167,23 @@ public class OpenShiftOAuthInterceptor implements Interceptor {
     String url = request.url().toString();
     // always retry in case of authorization endpoints; since they also return 200 when no
     // authorization header is provided
-    if (url.contains(K8S_AUTHORIZATION) || url.contains(OPENSHIFT_AUTHORIZATION)) {
+    if (isAuthorizationApiGroupRequest.test(url) && isCreateOnlyResourcePluralInUrl(url)) {
       return false;
     }
     return response.code() != HTTP_UNAUTHORIZED && response.code() != HTTP_FORBIDDEN;
+  }
+
+  private boolean isCreateOnlyResourcePluralInUrl(String url) {
+    return createOnlyResources.stream().anyMatch(url::contains);
+  }
+
+  private static void initCreateOnlyResources() {
+    createOnlyResources.add(HasMetadata.getPlural(LocalSubjectAccessReview.class));
+    createOnlyResources.add(HasMetadata.getPlural(LocalResourceAccessReview.class));
+    createOnlyResources.add(HasMetadata.getPlural(ResourceAccessReview.class));
+    createOnlyResources.add(HasMetadata.getPlural(SelfSubjectRulesReview.class));
+    createOnlyResources.add(HasMetadata.getPlural(SubjectRulesReview.class));
+    createOnlyResources.add(HasMetadata.getPlural(SubjectAccessReview.class));
+    createOnlyResources.add(HasMetadata.getPlural(SelfSubjectAccessReview.class));
   }
 }
