@@ -4,6 +4,7 @@
 #### Bugs
 * Fix #3832 #1883: simplifying the isHttpsAvailable check
 * Fix #3745: the client will throw better exceptions when a namespace is not discernible for an operation
+* Fix #4049: properly populate exception metadata with resource information if available
 
 #### Improvements
 * Remove `setIntVal`, `setStrVal`, `setKind` setters from `IntOrString` class to avoid invalid combinations
