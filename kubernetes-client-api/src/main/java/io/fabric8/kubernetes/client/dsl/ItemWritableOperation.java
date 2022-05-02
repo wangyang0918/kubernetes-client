@@ -16,6 +16,10 @@
 
 package io.fabric8.kubernetes.client.dsl;
 
+import io.fabric8.kubernetes.api.model.StatusDetails;
+
+import java.util.List;
+
 public interface ItemWritableOperation<T> extends DeletableWithOptions, ItemReplacable<T> {
 
   /**
@@ -24,12 +28,32 @@ public interface ItemWritableOperation<T> extends DeletableWithOptions, ItemRepl
    *
    * @param item to create or replace
    * @return created or replaced item returned in kubernetes api response
+   * @deprecated use resource(item).createOrReplace()
    */
+  @Deprecated
   T createOrReplace(T item);
 
+  /**
+   * Creates an item
+   *
+   * @see CreateOrReplaceable#create()
+   *
+   * @param item to create
+   * @return the item from the api server
+   * @deprecated use resource(item).create()
+   */
+  @Deprecated
   T create(T item);
 
-  boolean delete(T item);
+  /**
+   * Deletes an item
+   *
+   * @param item
+   * @return
+   * @deprecated use resource(item).delete()
+   */
+  @Deprecated
+  List<StatusDetails> delete(T item);
 
   /**
    * When the status subresource is enabled, the /status subresource for the custom resource is exposed.
@@ -39,9 +63,19 @@ public interface ItemWritableOperation<T> extends DeletableWithOptions, ItemRepl
    * @param item kubernetes object
    * @return updated object
    * @deprecated please use one of patchStatus, editStatus, or replaceStatus, or a locked replace
-   *             {@link Lockable#lockResourceVersion(String)}
+   *             {@link Resource#lockResourceVersion(String)}
    */
   @Deprecated
   T updateStatus(T item);
+
+  /**
+   * See {@link EditReplacePatchable#patchStatus()}
+   *
+   * @param item kubernetes object
+   * @return updated object
+   * @deprecated use resource(item).patchStatus()
+   */
+  @Deprecated
+  T patchStatus(T item);
 
 }

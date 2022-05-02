@@ -19,6 +19,7 @@ package io.fabric8.kubernetes.client.extension;
 import io.fabric8.kubernetes.api.builder.Visitor;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.ListOptions;
+import io.fabric8.kubernetes.api.model.StatusDetails;
 import io.fabric8.kubernetes.client.GracePeriodConfigurable;
 import io.fabric8.kubernetes.client.PropagationPolicyConfigurable;
 import io.fabric8.kubernetes.client.ResourceNotFoundException;
@@ -29,7 +30,7 @@ import io.fabric8.kubernetes.client.dsl.Gettable;
 import io.fabric8.kubernetes.client.dsl.Informable;
 import io.fabric8.kubernetes.client.dsl.ReplaceDeletable;
 import io.fabric8.kubernetes.client.dsl.Resource;
-import io.fabric8.kubernetes.client.dsl.WatchAndWaitable;
+import io.fabric8.kubernetes.client.dsl.Watchable;
 import io.fabric8.kubernetes.client.dsl.WritableOperation;
 import io.fabric8.kubernetes.client.dsl.base.PatchContext;
 import io.fabric8.kubernetes.client.informers.ResourceEventHandler;
@@ -51,7 +52,7 @@ import java.util.function.UnaryOperator;
  */
 public class ResourceAdapter<T> implements Resource<T> {
 
-  protected Resource<T> resource;
+  Resource<T> resource;
 
   public ResourceAdapter() {
 
@@ -61,8 +62,12 @@ public class ResourceAdapter<T> implements Resource<T> {
     this.resource = resource;
   }
 
+  public Resource<T> getResource() {
+    return resource;
+  }
+
   @Override
-  public boolean delete() {
+  public List<StatusDetails> delete() {
     return resource.delete();
   }
 
@@ -87,7 +92,7 @@ public class ResourceAdapter<T> implements Resource<T> {
   }
 
   @Override
-  public WatchAndWaitable<T> withResourceVersion(String resourceVersion) {
+  public Watchable<Watcher<T>> withResourceVersion(String resourceVersion) {
     return resource.withResourceVersion(resourceVersion);
   }
 
@@ -267,7 +272,7 @@ public class ResourceAdapter<T> implements Resource<T> {
   }
 
   @Override
-  public boolean delete(T item) {
+  public List<StatusDetails> delete(T item) {
     return resource.delete(item);
   }
 
@@ -279,6 +284,11 @@ public class ResourceAdapter<T> implements Resource<T> {
   @Override
   public ReplaceDeletable<T> lockResourceVersion() {
     return resource.lockResourceVersion();
+  }
+
+  @Override
+  public T patchStatus() {
+    return resource.patchStatus();
   }
 
 }

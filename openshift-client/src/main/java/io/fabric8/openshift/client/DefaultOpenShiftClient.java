@@ -19,6 +19,7 @@ import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.KubernetesList;
 import io.fabric8.kubernetes.api.model.KubernetesResourceList;
 import io.fabric8.kubernetes.api.model.RootPaths;
+import io.fabric8.kubernetes.api.model.StatusDetails;
 import io.fabric8.kubernetes.client.BaseClient;
 import io.fabric8.kubernetes.client.Client;
 import io.fabric8.kubernetes.client.Config;
@@ -33,7 +34,6 @@ import io.fabric8.kubernetes.client.dsl.CreateOrDeleteable;
 import io.fabric8.kubernetes.client.dsl.FunctionCallable;
 import io.fabric8.kubernetes.client.dsl.Gettable;
 import io.fabric8.kubernetes.client.dsl.InOutCreateable;
-import io.fabric8.kubernetes.client.dsl.LogWatch;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.Nameable;
 import io.fabric8.kubernetes.client.dsl.NamespaceListVisitFromServerGetDeleteRecreateWaitApplicable;
@@ -101,6 +101,7 @@ import io.fabric8.openshift.api.model.OAuthClientList;
 import io.fabric8.openshift.api.model.PodSecurityPolicyReview;
 import io.fabric8.openshift.api.model.PodSecurityPolicySelfSubjectReview;
 import io.fabric8.openshift.api.model.PodSecurityPolicySubjectReview;
+import io.fabric8.openshift.api.model.ProjectRequest;
 import io.fabric8.openshift.api.model.RangeAllocation;
 import io.fabric8.openshift.api.model.RangeAllocationList;
 import io.fabric8.openshift.api.model.ResourceAccessReview;
@@ -161,7 +162,6 @@ import io.fabric8.openshift.client.dsl.OpenShiftWhereaboutsAPIGroupDSL;
 import io.fabric8.openshift.client.dsl.ProjectOperation;
 import io.fabric8.openshift.client.dsl.ProjectRequestOperation;
 import io.fabric8.openshift.client.dsl.TemplateResource;
-import io.fabric8.openshift.client.dsl.internal.ProjectRequestsOperationImpl;
 import io.fabric8.openshift.client.dsl.internal.apps.DeploymentConfigOperationsImpl;
 import io.fabric8.openshift.client.dsl.internal.authorization.RoleBindingOperationsImpl;
 import io.fabric8.openshift.client.dsl.internal.build.BuildConfigOperationsImpl;
@@ -287,7 +287,7 @@ public class DefaultOpenShiftClient extends DefaultKubernetesClient
   }
 
   @Override
-  public MixedOperation<Build, BuildList, BuildResource<Build, LogWatch>> builds() {
+  public MixedOperation<Build, BuildList, BuildResource> builds() {
     return new BuildOperationsImpl(this);
   }
 
@@ -360,7 +360,7 @@ public class DefaultOpenShiftClient extends DefaultKubernetesClient
     return new NameableCreateOrDeleteable() {
 
       @Override
-      public boolean delete() {
+      public List<StatusDetails> delete() {
         return operation.delete();
       }
 
@@ -371,7 +371,19 @@ public class DefaultOpenShiftClient extends DefaultKubernetesClient
 
       @Override
       public CreateOrDeleteable<ImageSignature> withName(String name) {
-        return operation.withName(name);
+        return new CreateOrDeleteable<ImageSignature>() {
+
+          @Override
+          public ImageSignature create(ImageSignature item) {
+            return operation.withName(name).create(item);
+          }
+
+          @Override
+          public List<StatusDetails> delete() {
+            return operation.withName(name).delete();
+          }
+
+        };
       }
     };
   }
@@ -456,7 +468,10 @@ public class DefaultOpenShiftClient extends DefaultKubernetesClient
 
   @Override
   public ProjectRequestOperation projectrequests() {
-    return new ProjectRequestsOperationImpl(this);
+    MixedOperation<ProjectRequest, KubernetesResourceList<ProjectRequest>, Resource<ProjectRequest>> op = resources(
+        ProjectRequest.class, null);
+
+    return item -> op.resource(item).create();
   }
 
   @Override

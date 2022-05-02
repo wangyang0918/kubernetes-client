@@ -19,14 +19,19 @@ import io.fabric8.kubernetes.api.builder.TypedVisitor;
 import io.fabric8.kubernetes.api.builder.Visitor;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.HasMetadata;
+import io.fabric8.kubernetes.api.model.KubernetesResource;
 import io.fabric8.kubernetes.api.model.KubernetesResourceList;
 import io.fabric8.kubernetes.api.model.LabelSelector;
 import io.fabric8.kubernetes.api.model.ListOptions;
 import io.fabric8.kubernetes.api.model.ListOptionsBuilder;
+import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.ObjectReference;
 import io.fabric8.kubernetes.api.model.Status;
+import io.fabric8.kubernetes.api.model.StatusDetails;
+import io.fabric8.kubernetes.api.model.StatusDetailsBuilder;
 import io.fabric8.kubernetes.api.model.autoscaling.v1.Scale;
 import io.fabric8.kubernetes.api.model.extensions.DeploymentRollback;
+import io.fabric8.kubernetes.client.Client;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.KubernetesClientTimeoutException;
@@ -62,18 +67,21 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceList<T>, R extends Resource<T>>
@@ -359,10 +367,6 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
     return context.getFieldQueryParam();
   }
 
-  public String getLabelQueryParam() {
-    return context.getLabelQueryParam();
-  }
-
   @Override
   public L list() {
     return list(new ListOptions());
@@ -416,20 +420,74 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
     return options;
   }
 
+  static void toStatusDetails(KubernetesResource obj, List<StatusDetails> details) {
+    if (obj instanceof HasMetadata) {
+      HasMetadata meta = (HasMetadata) obj;
+      ObjectMeta metadata = meta.getMetadata();
+      details.add(new StatusDetailsBuilder()
+          .withGroup(ApiVersionUtil.trimGroup(meta.getApiVersion()))
+          .withKind(meta.getKind())
+          .withName(metadata == null ? null : metadata.getName())
+          .withUid(metadata == null ? null : metadata.getUid())
+          .build());
+    } else if (obj instanceof Status) {
+      details.add(((Status) obj).getDetails());
+    } else if (obj instanceof KubernetesResourceList) {
+      List<HasMetadata> items = ((KubernetesResourceList<HasMetadata>) obj).getItems();
+      if (items != null) {
+        items.forEach(i -> toStatusDetails(i, details));
+      }
+    } else {
+      // log?
+    }
+  }
+
   @Override
-  public boolean delete() {
-    if (item != null || (name != null && !name.isEmpty())) {
+  public List<StatusDetails> delete() {
+    if (Utils.isNotNullOrEmpty(name) || Utils.isNotNullOrEmpty(namespace) || !isResourceNamespaced()) {
       try {
-        deleteThis();
-        return true;
-      } catch (KubernetesClientException e) {
-        if (e.getCode() != HttpURLConnection.HTTP_NOT_FOUND) {
-          throw e;
+        URL resourceURLForWriteOperation = getResourceURLForWriteOperation(getResourceUrl());
+        ListOptions options = new ListOptions();
+        boolean useOptions = false;
+        if (Utils.isNullOrEmpty(name)) {
+          String fieldQueryParam = context.getFieldQueryParam();
+          if (fieldQueryParam != null) {
+            options.setFieldSelector(fieldQueryParam);
+            useOptions = true;
+          }
+          String labelQueryParam = context.getLabelQueryParam();
+          if (labelQueryParam != null) {
+            options.setLabelSelector(labelQueryParam);
+            useOptions = true;
+          }
         }
-        return false;
+        if (useOptions) {
+          resourceURLForWriteOperation = appendListOptionParams(resourceURLForWriteOperation, options);
+        }
+        KubernetesResource result = handleDelete(resourceURLForWriteOperation, gracePeriodSeconds, propagationPolicy,
+            resourceVersion);
+        ArrayList<StatusDetails> details = new ArrayList<>();
+        toStatusDetails(result, details);
+        return details;
+      } catch (Exception e) {
+        RuntimeException re = KubernetesClientException.launderThrowable(forOperationType("delete"), e);
+        if (re instanceof KubernetesClientException) {
+          KubernetesClientException ke = (KubernetesClientException) re;
+          if (Utils.isNotNullOrEmpty(name)) {
+            if (ke.getCode() == HttpURLConnection.HTTP_NOT_FOUND) {
+              return Collections.emptyList();
+            }
+          } else if (ke.getCode() == HttpURLConnection.HTTP_BAD_METHOD) {
+            // collection delete may not be supported, fall-back to single item delete
+            return list().getItems().stream().flatMap(i -> resource(i).delete().stream()).collect(Collectors.toList());
+          }
+        }
+        throw re;
       }
     }
-    return delete(list().getItems());
+    // if there is no name nor namespace and this is a namespaced resource, find each applicable namespace and issue a delete
+    Set<String> namespaces = list().getItems().stream().map(i -> i.getMetadata().getNamespace()).collect(Collectors.toSet());
+    return namespaces.stream().flatMap(n -> inNamespace(n).delete().stream()).collect(Collectors.toList());
   }
 
   @Override
@@ -457,6 +515,11 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
   }
 
   @Override
+  public T patchStatus() {
+    throw new KubernetesClientException(READ_ONLY_UPDATE_EXCEPTION_MESSAGE);
+  }
+
+  @Override
   public R resource(T item) {
     // set the name, namespace, and item - not all operations are looking at the item for the name
     // things like configMaps().load(...).watch(...) for example
@@ -468,19 +531,6 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
       ctx = ctx.withNamespace(itemNs);
     }
     return newResource(ctx);
-  }
-
-  void deleteThis() {
-    try {
-      if (item != null) {
-        updateApiVersion(item);
-        handleDelete(item, gracePeriodSeconds, propagationPolicy, resourceVersion);
-      } else {
-        handleDelete(getResourceURLForWriteOperation(getResourceUrl()), gracePeriodSeconds, propagationPolicy, resourceVersion);
-      }
-    } catch (Exception e) {
-      throw KubernetesClientException.launderThrowable(forOperationType("delete"), e);
-    }
   }
 
   @Override
@@ -789,7 +839,7 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
       if (l.isEmpty()) {
         return condition.test(null);
       }
-      return condition.test(l.get(0));
+      return l.stream().allMatch(condition);
     });
 
     if (!Utils.waitUntilReady(futureCondition, amount, timeUnit)) {
@@ -806,7 +856,6 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
   @Override
   public CompletableFuture<List<T>> informOnCondition(Predicate<List<T>> condition) {
     CompletableFuture<List<T>> future = new CompletableFuture<>();
-    AtomicReference<Runnable> tester = new AtomicReference<>();
 
     // create an informer that supplies the tester with events and empty list handling
     SharedIndexInformer<T> informer = this.createInformer(0);
@@ -815,10 +864,9 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
     future.whenComplete((r, t) -> informer.stop());
 
     // use the cache to evaluate the list predicate, trapping any exceptions
-    Runnable test = () -> {
+    Consumer<List<T>> test = list -> {
       try {
         // could skip if lastResourceVersion has not changed
-        List<T> list = informer.getStore().list();
         if (condition.test(list)) {
           future.complete(list);
         }
@@ -826,30 +874,28 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
         future.completeExceptionally(e);
       }
     };
-    tester.set(test);
 
     informer.addEventHandler(new ResourceEventHandler<T>() {
       @Override
       public void onAdd(T obj) {
-        test.run();
+        test.accept(informer.getStore().list());
       }
 
       @Override
       public void onDelete(T obj, boolean deletedFinalStateUnknown) {
-        test.run();
+        test.accept(informer.getStore().list());
       }
 
       @Override
       public void onUpdate(T oldObj, T newObj) {
-        test.run();
+        test.accept(informer.getStore().list());
       }
 
       @Override
       public void onNothing() {
-        test.run();
+        test.accept(informer.getStore().list());
       }
-    });
-    informer.run();
+    }).run();
     return future;
   }
 
@@ -958,6 +1004,11 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
   }
 
   @Override
+  public <C extends Client> C inWriteContext(Class<C> clazz) {
+    return context.clientInWriteContext(clazz);
+  }
+
+  @Override
   public int getWatchReconnectInterval() {
     return config.getWatchReconnectInterval();
   }
@@ -983,7 +1034,7 @@ public class BaseOperation<T extends HasMetadata, L extends KubernetesResourceLi
   }
 
   @Override
-  public boolean delete(T item) {
+  public List<StatusDetails> delete(T item) {
     return resource(item).delete();
   }
 

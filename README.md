@@ -115,7 +115,7 @@ System properties are preferred over environment variables. The following system
 | `kubernetes.truststore.passphrase` / `KUBERNETES_TRUSTSTORE_PASSPHRASE` | | |
 | `kubernetes.keystore.file` / `KUBERNETES_KEYSTORE_FILE` | | |
 | `kubernetes.keystore.passphrase` / `KUBERNETES_KEYSTORE_PASSPHRASE` | | |
-| `kubernetes.backwardsCompatibilityInterceptor.disable` / `KUBERNETES_BACKWARDSCOMPATIBILITYINTERCEPTOR_DISABLE` | `Disable BackwardsCompatibilityInterceptor`| `false` |
+| `kubernetes.backwardsCompatibilityInterceptor.disable` / `KUBERNETES_BACKWARDSCOMPATIBILITYINTERCEPTOR_DISABLE` | `Disable BackwardsCompatibilityInterceptor`| `true` |
 
 Alternatively you can use the `ConfigBuilder` to create a config object for the Kubernetes client:
 
@@ -244,7 +244,7 @@ Once the resource is loaded, you can treat it as you would, had you created it y
 For example lets read a pod, from a yml file and work with it:
 
     Pod refreshed = client.load('/path/to/a/pod.yml').fromServer().get();
-    Boolean deleted = client.load('/workspace/pod.yml').delete();
+    client.load('/workspace/pod.yml').delete();
     LogWatch handle = client.load('/workspace/pod.yml').watchLog(System.out);
 
 ### Passing a reference of a resource to the client
@@ -254,7 +254,7 @@ In the same spirit you can use an object created externally (either a reference 
 For example:
 
     Pod pod = someThirdPartyCodeThatCreatesAPod();
-    Boolean deleted = client.resource(pod).delete();
+    client.resource(pod).delete();
 
 ### Adapting the client
 
@@ -669,20 +669,21 @@ operations. However, some might require slightly more code to achieve same resul
 | `kubectl logs pod/my-pod -f`                                                       | [PodLogsFollowEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodLogsFollowEquivalent.java) |
 | `kubectl logs pod/my-pod -c c1`                                                    | [PodLogsMultiContainerEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodLogsMultiContainerEquivalent.java) |
 | `kubectl port-forward my-pod 8080:80`                                              | [PortForwardEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PortForwardEquivalent.java) |
-| `kubectl get pods --selector=version=v1 -o jsonpath='{.items[*].metadata.name}'`   | [PodListFilterByLabel.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodListFilterByLabel.java)
-| `kubectl get pods --field-selector=status.phase=Running`                           | [PodListFilterFieldSelector.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodListFilterFieldSelector.java)
-| `kubectl get pods --show-labels`                                                   | [PodShowLabels.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodShowLabels.java)
-| `kubectl label pods my-pod new-label=awesome`                                      | [PodAddLabel.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodAddLabel.java)
-| `kubectl annotate pods my-pod icon-url=http://goo.gl/XXBTWq`                       | [PodAddAnnotation.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodAddAnnotation.java)
+| `kubectl get pods --selector=version=v1 -o jsonpath='{.items[*].metadata.name}'`   | [PodListFilterByLabel.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodListFilterByLabel.java) |
+| `kubectl get pods --field-selector=status.phase=Running`                           | [PodListFilterFieldSelector.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodListFilterFieldSelector.java) |
+| `kubectl get pods --show-labels`                                                   | [PodShowLabels.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodShowLabels.java) |
+| `kubectl label pods my-pod new-label=awesome`                                      | [PodAddLabel.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodAddLabel.java) |
+| `kubectl annotate pods my-pod icon-url=http://goo.gl/XXBTWq`                       | [PodAddAnnotation.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/PodAddAnnotation.java) |
 | `kubectl get configmap cm1 -o jsonpath='{.data.database}'`                         | [ConfigMapJsonPathEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/ConfigMapJsonPathEquivalent.java) |
 | `kubectl create -f test-svc.yaml`                                                  | [LoadAndCreateService.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/LoadAndCreateService.java) |
 | `kubectl create -f test-deploy.yaml`                                               | [LoadAndCreateDeployment.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/LoadAndCreateDeployment.java) |
-| `kubectl set image deploy/d1 nginx=nginx:v2`                                       | [RolloutSetImageEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutSetImageEquivalent.java)
-| `kubectl scale --replicas=4 deploy/nginx-deployment`                               | [ScaleEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/ScaleEquivalent.java)
-| `kubectl rollout restart deploy/d1`                                                | [RolloutRestartEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutRestartEquivalent.java)
-| `kubectl rollout pause deploy/d1`                                                  | [RolloutPauseEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutPauseEquivalent.java)
-| `kubectl rollout resume deploy/d1`                                                 | [RolloutResumeEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutResumeEquivalent.java)
-| `kubectl rollout undo deploy/d1`                                                   | [RolloutUndoEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutUndoEquivalent.java)
+| `kubectl set image deploy/d1 nginx=nginx:v2`                                       | [RolloutSetImageEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutSetImageEquivalent.java) |
+| `kubectl scale --replicas=4 deploy/nginx-deployment`                               | [ScaleEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/ScaleEquivalent.java) |
+| `kubectl scale statefulset --selector=app=my-database --replicas=4`                | [ScaleWithLabelsEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/ScaleWithLabelsEquivalent.java) |
+| `kubectl rollout restart deploy/d1`                                                | [RolloutRestartEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutRestartEquivalent.java) |
+| `kubectl rollout pause deploy/d1`                                                  | [RolloutPauseEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutPauseEquivalent.java) |
+| `kubectl rollout resume deploy/d1`                                                 | [RolloutResumeEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutResumeEquivalent.java) |
+| `kubectl rollout undo deploy/d1`                                                   | [RolloutUndoEquivalent.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/RolloutUndoEquivalent.java) |
 | `kubectl create -f test-crd.yaml`                                                  | [LoadAndCreateCustomResourceDefinition.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/LoadAndCreateCustomResourceDefinition.java) |
 | `kubectl create -f customresource.yaml`                                            | [CustomResourceCreateDemo.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/CustomResourceCreateDemo.java) |
 | `kubectl create -f customresource.yaml`                                            | [CustomResourceCreateDemoTypeless.java](./kubernetes-examples/src/main/java/io/fabric8/kubernetes/examples/kubectl/equivalents/CustomResourceCreateDemoTypeless.java) |
