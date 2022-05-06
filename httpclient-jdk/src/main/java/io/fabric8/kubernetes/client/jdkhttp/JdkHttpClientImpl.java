@@ -254,8 +254,7 @@ public class JdkHttpClientImpl implements HttpClient {
   }
 
   /*
-   * TODO: this may not be the best way to do this - in general
-   * instead we create a reponse to hold them both
+   * TODO: this may not be the best way to do this
    */
   private static class WebSocketResponse {
     public WebSocketResponse(WebSocket w, java.net.http.WebSocketHandshakeException wshse) {
@@ -323,8 +322,6 @@ public class JdkHttpClientImpl implements HttpClient {
     if (webSocketBuilder.subprotocol != null) {
       newBuilder.subprotocols(webSocketBuilder.subprotocol);
     }
-    // the Watch logic sets a websocketTimeout as the readTimeout
-    // TODO: this should probably be made clearer in the docs
     if (this.builder.readTimeout != null) {
       newBuilder.connectTimeout(this.builder.readTimeout);
     }
