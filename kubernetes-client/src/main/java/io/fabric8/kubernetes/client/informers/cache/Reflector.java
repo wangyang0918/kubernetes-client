@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class Reflector<T extends HasMetadata, L extends KubernetesResourceList<T>> {
 
   private static final Logger log = LoggerFactory.getLogger(Reflector.class);
+  private static final String zeroResourceVersion = "0";
 
   private volatile String lastSyncResourceVersion;
   private final Class<T> apiTypeClass;
@@ -93,7 +94,8 @@ public class Reflector<T extends HasMetadata, L extends KubernetesResourceList<T
     Set<String> nextKeys = new LinkedHashSet<>();
     do {
       result = listerWatcher
-          .list(new ListOptionsBuilder().withLimit(listerWatcher.getLimit()).withContinue(continueVal).build());
+          .list(new ListOptionsBuilder().withResourceVersion(zeroResourceVersion).withLimit(listerWatcher.getLimit())
+            .withContinue(continueVal).build());
       result.getItems().forEach(i -> {
         String key = store.getKey(i);
         // process the updates immediately so we don't need to hold the item
